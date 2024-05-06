@@ -1,0 +1,10 @@
+"0",""
+"0","#t <- tree %>% ggtree(branch.length='none', layout='circular') +"
+"0","    #geom_tiplab()"
+"0",""
+"0","t <- tree %>% ggtree(layout='daylight') +"
+"0","    geom_tiplab()"
+"2","Average angle change [1] 0.144053536062421
+"
+"2","Average angle change [2] 0.126020870836052
+"

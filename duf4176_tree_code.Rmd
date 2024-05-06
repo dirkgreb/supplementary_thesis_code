@@ -1,0 +1,55 @@
+---
+title: "ggtree"
+author: "Dirk Grebenc"
+date: "20/07/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(bioseq)
+library(treedataverse)
+library(aplot)
+library(systemfonts)
+library(svglite)
+library(readxl)
+setwd("..")
+source("./src/R_Functions_sequences_and_plotting.R")
+```
+
+```{r}
+
+library(aplot)
+library(systemfonts)
+library(svglite)
+
+tree_file <- 'DUF4176_s_tree.nwk'
+csv_in <- 'DUF4176_sampled.csv'
+active_df <- read.csv(csv_in)
+
+tree <- read.tree(tree_file)
+
+
+
+orders_df <- active_df %>%
+        select(`accession`, `order`,`cluster_num`)
+
+```
+
+```{r}
+
+t <- tree %>% ggtree(branch.length='none', layout='circular') +
+    geom_tiplab()
+
+#t <- tree %>% ggtree(layout='daylight') +
+    #geom_tiplab()
+
+order_tree <- t %<+% orders_df +
+        geom_tippoint(aes(color = factor(`order`))) +
+        geom_tiplab(aes(label=label))
+
+order_tree
+ggsave(file="test.svg", plot=order_tree, width=10, height=20)
+#msaplot(order_tree, aln_fasta_file)
+```

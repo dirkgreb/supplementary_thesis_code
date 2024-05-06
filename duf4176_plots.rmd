@@ -1,0 +1,417 @@
+---
+title: "R Notebook"
+output: html_document
+
+---
+
+The [R plugin](https://www.jetbrains.com/help/pycharm/r-plugin-support.html) for IntelliJ-based IDEs provides
+handy capabilities to work with the [R Markdown](https://www.jetbrains.com/help/pycharm/r-markdown.html) files.
+To [add](https://www.jetbrains.com/help/pycharm/r-markdown.html#add-code-chunk) a new R chunk,
+
+# Basic Sequence Statistics
+
+
+## Libraries
+
+```{r}
+library(tidyverse)
+library(bioseq)
+library(treedataverse)
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(bioseq)
+library(treedataverse)
+library(aplot)
+library(systemfonts)
+library(svglite)
+library(readxl)
+setwd("~/Dropbox/EsxA_paper/Dirk_wkdir/binfo")
+source("./scripts/R_Functions_sequences_and_plotting.R")
+```
+
+
+## Path variables 
+
+```{r}
+setwd("/Users/dirk/bio/DUF_Report_Code/python_code/DUF4176_Jan24")
+
+
+ip_list_full <- "./fasta_in/interpro-duf4176-list.fasta"
+
+select_genes_file <- "./fasta_in/duf4176_210to246_ipr_thresh90_plus_sir_0168.fasta"
+
+uniprot_file_path <- "uniprot_list.tsv"
+
+tree_file <- "terminal_workspace/fastTree_inputs/DUF3130_thresh40_plus_selected.fasta_aln.fasta.tree"
+```
+## File SetUp functions
+
+TODO - make a function that infers name from file, stores in a string for fileout naming
+
+```{r}
+
+fasta_to_tibble <- function (fasta_path) {
+  seqs <- read_fasta(fasta_path, type = "AA")
+  tibble_out <- tibble(label = names(seqs), sequences = seqs, aa_length = seq_nchar(seqs))
+  tibble_out
+}
+
+make_accession_col <- function (tibble_in) {
+  tibble_out <- tibble_in %>%
+          mutate(accession = str_extract(label, "\\w+(?=\\|)"))
+  tibble_out
+}
+
+day_random_string <- function () {
+  today <- Sys.Date()
+  today_str <- format(today, format="%b%d")
+  random_number <- as.character(sample(1000:9999, 1))
+  string_out <- str_interp("Exported_Accessions_${today_str}_${random_number}.txt")
+  string_out
+}
+
+export_accessions <- function (tibble_in) {
+  unique_name <- day_random_string()
+  tibble_in[,"accession"] %>%
+          write_tsv(unique_name,
+            col_names = FALSE)
+}
+
+connect_data <- function (df, uniprot_file){
+  uniprot_df <- read_tsv(uniprot_file)
+  df_out <- inner_join(uniprot_df, df, by = c("Entry" = "accession"))
+  df_out
+}
+
+write_clean_fasta <- function (df, outputName){
+  string_out <- str_interp("${outputName}.fasta")
+  df %>%
+          select(Entry, sequences) %>%
+          deframe() %>%
+          write_fasta(string_out)
+
+}
+
+
+
+```
+## SetUp files, get accessions
+
+```{r}
+
+ip_list <- ip_list_full %>%
+        fasta_to_tibble() %>%
+        make_accession_col()
+
+
+select_genes <- select_genes_file %>%
+        fasta_to_tibble() %>%
+        make_accession_col()
+
+# l2 <- ip_list %>% mutate(accession = str_extract(label, "\\w+(?=\\|)"))
+# l2
+#
+# str_extract()
+```
+```{r}
+export_accessions(ip_list)     # Writes list of accessions, to be uploaded to uniProt
+```
+
+## Genes of interest tibble generation 
+
+```{r}
+
+
+```
+## Data from Uniprot
+
+Only download active entries
+
+Download - Entry, gene names, taxonomic lineage - family order and species.
+```{r}
+
+uniprot_file_path <- "uniprot_list.tsv"
+
+uniprot_df <- read_tsv(uniprot_file_path)
+
+active_df <- right_join(uniprot_df, select_genes, by = c("Entry" = "label"))
+
+```
+
+```{r}
+
+active_df %>% count(`Taxonomic lineage (FAMILY)`) %>% filter(n > 10)
+active_df %>% count(`Taxonomic lineage (ORDER)`)
+
+new <- active_df %>% 
+  filter(`Entry` == "SACOL2603" | 
+           `Entry` == "Imo0138" |
+           `Entry` == "CVT43_05920" |
+           `Entry` == "SIR_1491") 
+
+new
+
+```
+### Export Fastas for CDHit and alignment
+```{r}
+
+active_df %>% write_clean_fasta("DUF3130_all_entries")
+
+active_df %>%
+        filter(`Taxonomic lineage (FAMILY)` == "Streptococcaceae") %>%
+        write_clean_fasta("DUF3130_Streptococcaceae")
+
+active_df %>%
+        filter(`Taxonomic lineage (FAMILY)` == "Listeriaceae") %>%
+        write_clean_fasta("DUF3130_Listeriaceae")
+
+active_df %>%
+        filter(`Taxonomic lineage (FAMILY)` == "Bacillaceae") %>%
+        write_clean_fasta("DUF3130_Bacillaceae")
+
+active_df %>%
+        filter(`Taxonomic lineage (FAMILY)` == "Staphylococcaceae") %>%
+        write_clean_fasta("DUF3130_Staphylococcaceae")
+
+active_df %>%
+        filter(`Taxonomic lineage (FAMILY)` == "Enterococcaceae") %>%
+        write_clean_fasta("DUF3130_Enterococcaceae")
+
+active_df %>%
+        filter(`Taxonomic lineage (ORDER)` == "Lactobacillales") %>%
+        write_clean_fasta("DUF3130_Lactobacillales")
+
+active_df %>%
+        filter(`Taxonomic lineage (ORDER)` == "Bacillales") %>%
+        write_clean_fasta("DUF3130_Bacillales")
+
+```
+
+
+
+```{r}
+
+library(aplot)
+library(systemfonts)
+library(svglite)
+
+
+
+tree <- read.tree(tree_file)
+
+aln_fasta_file <- "./terminal_workspace/fastTree_inputs/DUF3130_thresh40_plus_selected.fasta_aln.fasta"
+
+orders_df <- active_df %>%
+        select(Entry, `Taxonomic lineage (ORDER)`, `Taxonomic lineage (FAMILY)`)
+
+popular_families <- orders_df %>% count(`Taxonomic lineage (FAMILY)`) %>% filter(n > 30) %>% pull(`Taxonomic lineage (FAMILY)`)
+
+
+
+t <- tree %>% ggtree(branch.length='none', layout='circular') +
+    geom_tiplab()
+
+#nn <- sample(unique(reorder(tree, 'postorder')$edge[,1]), 4)
+#pp <- lapply(nn, function(n) {
+#    t <- rotate(t, n)
+#    t + geom_point2(aes(subset=(node == n)), color='red', size=3)
+#})
+
+#plot_list(gglist=pp, tag_levels='A', nrow=1)
+order_tree <- t %<+% orders_df +
+        geom_tippoint(aes(color = factor(`Taxonomic lineage (ORDER)`))) +
+        geom_tiplab(aes(label=label))
+
+order_tree
+ggsave(file="test.svg", plot=order_tree, width=10, height=20)
+#msaplot(order_tree, aln_fasta_file)
+```
+
+
+```{r}
+lacto_tree_file <- read.tree("./terminal_workspace/fastTree_inputs/cleaned_up_DUF3130_Lactobacillales.fasta_thresh40.fasta_aln.fasta.tree")
+
+fasta_file <- "./terminal_workspace/fastTree_inputs/"
+
+lacto_orders_df <- active_df %>%
+        select(Entry, `Taxonomic lineage (ORDER)`, `Taxonomic lineage (FAMILY)`)
+
+lacto_tree <- lacto_tree_file %>% ggtree(branch.length='none', layout='rectangular')
+
+lacto_tree <- lacto_tree %<+% lacto_orders_df +
+        geom_tippoint(aes(color = factor(`Taxonomic lineage (FAMILY)`))) +
+        geom_tiplab(align= TRUE) 
+#lacto_tree
+msaplot(lacto_tree, fasta_file, window = c(35,50))
+
+```
+
+```{r}
+bacil_tree_file <- read.tree("./terminal_workspace/fastTree_inputs/cleaned_up_DUF3130_Bacillales.fasta_thresh99.fasta_aln.fasta.tree")
+bacil_orders_df <- active_df %>%
+        select(Entry, `Taxonomic lineage (ORDER)`, `Taxonomic lineage (FAMILY)`)
+
+bacil_tree <- bacil_tree_file %>% ggtree(branch.length='none', layout='circular')
+
+bacil_tree <- bacil_tree %<+% bacil_orders_df +
+        geom_tippoint(aes(color = factor(`Taxonomic lineage (FAMILY)`)))
+bacil_tree
+
+```
+```{r}
+family_tree <- t %<+% orders_df +
+        geom_tippoint(aes(color = factor(`Taxonomic lineage (FAMILY)`)))
+family_tree
+# d <- subset(d, isTip)
+
+```
+
+
+```{r}
+
+
+
+
+```
+
+
+## Taxonomy Distribution Graphs
+```{r}
+
+pie <- ggplot(active_df,
+              aes(x = `Taxonomic lineage (SPECIES)`,
+                  fill = `Taxonomic lineage (ORDER)`)) +
+        geom_bar() +
+        coord_polar() #+
+        #scale_y_continuous(trans='log2')
+pie
+
+```
+
+
+## Graphing Functions
+```{r}
+
+lengths_graph <- function (tibble_in) {
+  ggplot(tibble_in, aes(x=aa_length)) +
+          geom_histogram(binwidth = 2, fill = "white", colour = "black") +
+          theme_bw()
+}
+
+lengths_graph_anno <- function (tibble_in) {
+
+  length_statistics <- summary(tibble_in$aa_length)
+  min_label <- str_c(names(length_statistics[1]), ":", as.character(length_statistics[[1]]), sep=" ")
+  max_label <- str_c(names(length_statistics[6]), ":", as.character(length_statistics[[6]]), sep=" ")
+  median_label <- str_c(names(length_statistics[3]), ":", as.character(length_statistics[[3]]), sep=" ")
+  mean_label <- str_c(names(length_statistics[4]), ":", round(length_statistics[[4]], digits=0), sep=" ")
+  q1_label <- str_c(names(length_statistics[2]), ":", as.character(length_statistics[[2]]), sep=" ")
+  q3_label <- str_c(names(length_statistics[5]), ":", as.character(length_statistics[[5]]), sep=" ")
+
+  p <- lengths_graph(tibble_in)
+
+  p +
+    annotate("segment", x = length_statistics[[1]], xend = length_statistics[[1]], y = 0, yend = 500, colour = "blue") +
+    annotate("segment", x = length_statistics[[6]], xend = length_statistics[[6]], y = 0, yend = 500, colour = "blue") +
+    annotate("segment", x = length_statistics[[3]], xend = length_statistics[[3]], y = 0, yend = 500, colour = "yellow") +
+    annotate("segment", x = length_statistics[[4]], xend = length_statistics[[4]], y = 0, yend = 500, colour = "orange") +
+    annotate("rect", xmin = length_statistics[[2]], xmax = length_statistics[[5]], ymin = 0, ymax = 400, alpha = 0.1) +
+    annotate("text", x = (length_statistics[[1]] + 3), y = 500, label=min_label, colour="blue") +
+    annotate("text", x = (length_statistics[[6]] - 3), y = 500, label=max_label, colour="blue") +
+    annotate("text", x = (length_statistics[[3]] - 3), y = 485, label=median_label, colour="yellow") +
+    annotate("text", x = (length_statistics[[4]] + 3), y = 485, label=mean_label, colour="orange")
+
+}
+
+
+
+```
+
+## Example graphs
+```{r}
+
+simple_graph <- lengths_graph(full_list)
+#simple_graph
+
+annotated_graph <- lengths_graph_anno(full_list)
+#annotated_graph
+```
+
+```{r}
+
+
+#str_c()
+#accessions
+
+#standard_cutoff
+#mean(standard_cutoff$aa_length)
+#sd(standard_cutoff$aa_length)
+
+```
+
+
+
+```{r}
+
+length_statistics <- summary(full_list_quick_cut$aa_length)
+min_label <- str_c(names(length_statistics[1]), ":", as.character(length_statistics[[1]]), sep=" ")
+max_label <- str_c(names(length_statistics[6]), ":", as.character(length_statistics[[6]]), sep=" ")
+median_label <- str_c(names(length_statistics[3]), ":", as.character(length_statistics[[3]]), sep=" ")
+mean_label <- str_c(names(length_statistics[4]), ":", round(length_statistics[[4]], digits=0), sep=" ")
+q1_label <- str_c(names(length_statistics[2]), ":", as.character(length_statistics[[2]]), sep=" ")
+q3_label <- str_c(names(length_statistics[5]), ":", as.character(length_statistics[[5]]), sep=" ")
+
+ggplot(full_list_quick_cut, aes(x=aa_length)) +
+        geom_histogram(binwidth = 1, fill = "white", colour = "black") +
+        theme_bw() +
+        annotate("segment", x = length_statistics[[1]], xend = length_statistics[[1]], y = 0, yend = 500, colour = "blue") +
+        annotate("segment", x = length_statistics[[6]], xend = length_statistics[[6]], y = 0, yend = 500, colour = "blue") +
+        #annotate("segment", x = length_statistics[[3]], xend = length_statistics[[3]], y = 0, yend = 500, colour = "yellow") +
+        annotate("segment", x = length_statistics[[4]], xend = length_statistics[[4]], y = 0, yend = 500, colour = "orange") +
+        #annotate("rect", xmin = length_statistics[[2]], xmax = length_statistics[[5]], ymin = 0, ymax = 400, alpha = 0.1) +
+        annotate("text", x = (length_statistics[[1]] + 3), y = 500, label=min_label, colour="blue") +
+        annotate("text", x = (length_statistics[[6]] - 3), y = 500, label=max_label, colour="blue") +
+        #annotate("text", x = (length_statistics[[3]] - 3), y = 485, label=median_label, colour="yellow") +
+        annotate("text", x = (length_statistics[[4]] + 3), y = 485, label=mean_label, colour="orange")
+
+
+```
+```{r}
+# Not needed, can produce the accession list from the tibble
+accession_list <- function (tibble_in) {
+  split_accessions_v <- tibble_in$label %>%
+          str_split_fixed("\\|", n=2)
+  split_accessions_t <- as_tibble(split_accessions_v)
+  split_accessions_col <- split_accessions_t %>% select(V1)
+  split_accessions_col
+}
+
+
+
+
+
+  annotate("segment", x = length_statistics[[2]], xend = length_statistics[[2]], y = 0, yend = 300, colour = "red", label = names(length_statistics[2])) +
+  annotate("segment", x = length_statistics[[5]], xend = length_statistics[[5]], y = 0, yend = 300, colour = "red", label = names(length_statistics[5])) +
+  annotate("segment", x = length_statistics[[3]], xend = length_statistics[[3]], y = 0, yend = 500, colour = "yellow", label = names(length_statistics[3])) +
+  annotate("segment", x = length_statistics[[4]], xend = length_statistics[[4]], y = 0, yend = 500, colour = "green", label = names(length_statistics[4])) +
+
+
+  ggplot(thresh40, aes(x=aa_length)) +
+  geom_histogram(binwidth = 2, fill = "white", colour = "black")
+
+
+ggplot(seqs_data, aes(x=aa_length)) +
+    geom_histogram(binwidth = 2, fill = "white", colour = "black") +
+
+
+# seqs_data2 <- seqs_data %>%
+#   mutate(seq_length = nchar(sequence) %>%
+#   select(label, accession, sequence, seq_length)
+# seqs_data2
+# %>%
+# select(label, accession, sequences, aa_length)
+```
